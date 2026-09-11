@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Build the coding image locally (validates the whole image path, and gives
+# you a .qcow2.gz you can inspect or keep).
+#
+# The image carries machine0's substituters, but the *build* runs here — so
+# pass their caches too, or nix compiles ~450 derivations (hermes-agent's
+# Python wheels, playwright, etc.) from source. With the caches it is ~44
+# derivations + ~2.6 GiB of downloads.
+#
+# This does NOT publish the image to machine0 — machine0 builds images
+# server-side from a git repo, or snapshots a VM. See README.md.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+profile="${1:-coding}"
+
+m0_caches=(
+  --substituters "https://cache.nixos.org https://machine0.cachix.org https://cache.garnix.io"
+  --trusted-public-keys "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= machine0.cachix.org-1:l34M6e3/+rNZJqlpANywfgeOhBBW6r0eo0VSVIh0PIk= cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+)
+
+echo "==> nix build .#${profile}  (qcow2.gz)"
+nix build ".#${profile}" -o result-image --print-build-logs "${m0_caches[@]}"
+echo
+echo "==> $(readlink -f result-image)"
+du -sh "$(readlink -f result-image)" 2>/dev/null || true

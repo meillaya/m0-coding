@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Spin up a VM for one coding project from the reusable image.
+#
+#   bin/m0-new api
+#   bin/m0-new api xl default        # size, machine0 profile (integrations/MCPs)
+#
+# Everything the image bakes in (agents, toolchains, hosts config) is
+# already there — no rebuild. Per-project config lives either in the
+# project repo's devShell (direnv) or in projects/<name>/project.nix.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+project="${1:?usage: m0-new <project> [size] [m0-profile]}"
+size="${2:-medium}"
+m0profile="${3:-default}"
+image="${M0_IMAGE:-$(jq -r '.profiles[0].image' manifest.json)}"
+
+echo "==> machine0 new $project --image $image --size $size --profile $m0profile"
+machine0 new "$project" --image "$image" --size "$size" --profile "$m0profile"
+
+machine0 get "$project"
+echo
+echo "==> machine0 ssh $project"
+echo "    inside: git clone <repo>, then 'direnv allow' to load the project devShell"

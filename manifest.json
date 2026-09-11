@@ -1,0 +1,12 @@
+{
+  "profiles": [
+    {
+      "profile": "coding",
+      "image": "m0-coding",
+      "description": "Reusable coding image: machine0 loaded profile + Hermes/OpenCode + polyglot toolchain",
+      "builderSize": "large",
+      "testSize": "medium",
+      "minSize": "medium"
+    }
+  ]
+}

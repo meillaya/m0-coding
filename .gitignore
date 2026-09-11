@@ -1,0 +1,10 @@
+result
+result-image
+result-*
+.direnv/
+*.qcow2
+*.qcow2.gz
+
+# Local read-only clone of github:fdmtl/machine0-nixos used for reference
+# while writing modules/coding.nix. Safe to delete.
+upstream/

@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Create (or refresh) a NixOS VM from THIS flake, then verify the agents.
+#
+# The flake is synced from the local working tree by `machine0 provision`,
+# so nothing has to be pushed to GitHub while you iterate.
+#
+#   bin/m0-dev                      # vm: m0-dev, size: large
+#   bin/m0-dev mybox xl
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+vm="${1:-m0-dev}"
+size="${2:-large}"
+profile="${3:-coding}"
+base_image="${M0_BASE_IMAGE:-nixos-25-11-loaded}"
+
+if ! command -v machine0 >/dev/null 2>&1; then
+  echo "machine0 CLI not found. Install it:" >&2
+  echo "  curl -LsSf https://machine0.io/install.sh | sh" >&2
+  exit 1
+fi
+
+if machine0 get "$vm" --json >/dev/null 2>&1; then
+  dist="$(machine0 get "$vm" --json | jq -r '.distribution // empty')"
+  if [ "$dist" != "nixos" ]; then
+    echo "error: $vm exists but is not a NixOS VM (distribution=$dist)" >&2
+    exit 1
+  fi
+  echo "==> reusing existing VM '$vm'"
+else
+  echo "==> creating '$vm' from $base_image ($size)"
+  # medium or larger: nix builds are CPU/RAM hungry, small is painful.
+  machine0 new "$vm" --image "$base_image" --size "$size"
+fi
+
+echo "==> provisioning .#${profile} (syncs this flake, runs nixos-rebuild switch)"
+# 10 minutes is the documented budget for a provision build.
+machine0 provision "$vm" ".#${profile}"
+
+echo "==> verifying agents on $vm"
+machine0 ssh "$vm" bash -lc '
+  set -u
+  rc=0
+  for c in claude codex hermes opencode just direnv docker node pnpm uv gh; do
+    if command -v "$c" >/dev/null 2>&1; then
+      printf "  ok    %s (%s)\n" "$c" "$(command -v "$c")"
+    else
+      printf "  MISS  %s\n" "$c"; rc=1
+    fi
+  done
+  echo
+  echo "  docker: $(docker info >/dev/null 2>&1 && echo up || echo "not running")"
+  exit $rc
+'
+
+echo
+echo "==> ready:  machine0 ssh $vm"
+echo "    when it is what you want, freeze it:  bin/m0-snap $vm"
