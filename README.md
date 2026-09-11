@@ -23,7 +23,10 @@ Inherited from machine0's `loaded` profile:
 Added by `modules/coding.nix`:
 
 - agents `hermes` (NousResearch) and `opencode` — toggleable via `m0coding.agents.*`
-- nodejs_22 + pnpm + deno, direnv + nix-direnv (wired into zsh), just, watchexec, hyperfine
+- **devenv.sh** (1.11.x) + direnv + nix-direnv, so any project gets its own
+  reproducible environment; the devenv.cachix.org binary cache is added to
+  `nix.settings.substituters` (merged with upstream's caches)
+- nodejs_22 + pnpm + deno, just, watchexec, hyperfine
 - docker compose, git-lfs, git delta, tree, fd, bat, yq-go
 - database/CLI clients: psql, redis-cli, sqlite
 - NixOS-patched Playwright browsers + `PLAYWRIGHT_*` env for the agents — toggleable via `m0coding.playwright.enable`
@@ -91,9 +94,19 @@ flake git revision as image metadata.
 
 Two levels, pick the lightest that works:
 
-1. **devShell in the project repo** (no VM rebuild) — commit a
-   `flake.nix`/`shell.nix` + `.envrc` with `use flake`, then `direnv allow`
-   on the VM. direnv + nix-direnv are installed for exactly this.
+1. **devenv / devShell in the project repo** (no VM rebuild) — that is what
+   the image is built for:
+
+   ```bash
+   # on the VM, in the project
+   devenv init            # or write devenv.nix by hand
+   echo 'use devenv' > .envrc    # also works: use flake
+   direnv allow
+   devenv shell           # or just `cd` back in
+   ```
+
+   Agents pick the environment up automatically because direnv + nix-direnv
+   are wired into the `nix` user's zsh.
 2. **A project profile in this repo** — copy `projects/example/project.nix`
    and build a system from it:
 
@@ -136,6 +149,9 @@ becomes the image's minimum VM size.
   `machine0.cachix.org` + `cache.garnix.io` (where hermes-agent's Python
   closure lives). Without them nix compiles ~450 derivations from source;
   with them it is ~44 trivial ones plus ~2.6 GiB of downloads.
+- **devenv projects share the image's cache.** `devenv.cachix.org` is in the
+  image's substituters, so `devenv shell` on a fresh project substitutes
+  instead of compiling.
 - **auto-upgrade is disabled by default.** Upstream sets
   `system.autoUpgrade.flake = "github:fdmtl/machine0-nixos"`, which would
   rebuild the plain `loaded` profile nightly and silently drop this layer.

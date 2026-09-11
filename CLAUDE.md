@@ -28,6 +28,10 @@ bin/m0-new           # create a project VM from the reusable image
   `modules/development/packages.nix` first.
 - New package or service → `modules/coding.nix`. New toggle → an option under
   `m0coding.*` with a default, so project flakes can turn it off.
+- Project environments are **devenv.sh + direnv** (both in the image, plus the
+  devenv.cachix.org substituter added to `nix.settings.substituters`). Prefer
+  pointing a project at a `devenv.nix`/devShell over adding language toolchains
+  to this image.
 - Two places define `system.autoUpgrade` in this flake: upstream
   (`core/nix.nix`, `mkDefault` on `flake`) and `modules/coding.nix`
   (`mkForce`). Do not remove the `mkForce` — without it the nightly rebuild

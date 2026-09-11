@@ -38,8 +38,9 @@ let
     deno
 
     # ── Per-project workflow ──────────────────────────────────────────────
-    direnv # `use flake` in .envrc, wired into zsh below
+    direnv # `use flake` / `use devenv` in .envrc, wired into zsh below
     nix-direnv # cached devShell envs
+    devenv # devenv.sh: per-project dev environments (nix + devenv.nix)
     just # task runner — most repos carry a justfile
     watchexec # re-run on change
     hyperfine # benchmark before/after a change
@@ -115,6 +116,17 @@ in
       ++ lib.optionals cfg.agents.opencode.enable [ pkgs.opencode ]
       ++ lib.optionals cfg.playwright.enable [ playwrightBrowsers ];
 
+    # devenv.sh pulls prebuilt toolchains from its own cache; without it
+    # every `devenv shell` on a fresh project compiles from source. These are
+    # *additional* definitions of the list options, so they concatenate with
+    # upstream core/nix.nix's list rather than replacing it.
+    nix.settings = {
+      substituters = [ "https://devenv.cachix.org" ];
+      trusted-public-keys = [
+        "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw="
+      ];
+    };
+
     # direnv in the `nix` user's zsh, so dropping `use flake` in a repo's
     # .envrc gives agents the project's devShell automatically.
     home-manager.users.nix = {
@@ -161,11 +173,15 @@ in
           "$ hermes setup    # Hermes Agent (first run)"
           "$ opencode        # OpenCode"
           ""
+          "# Per-project environments (devenv.sh + direnv):"
+          "$ devenv init     # writes devenv.nix / devenv.yaml"
+          "$ direnv allow    # after: echo 'use devenv' > .envrc"
+          ""
           "# Give the agents machine0's own skills (once):"
           "$ machine0 skills install"
           ""
-          "# Project workflow: direnv + just + docker compose are installed."
-          "-> https://docs.machine0.io/platform/provisioning"
+          "# Also installed: just, docker compose, pnpm, deno, psql/redis-cli."
+          "-> https://devenv.sh/getting-started"
         ];
       }
     );
