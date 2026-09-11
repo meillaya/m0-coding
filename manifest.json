@@ -3,10 +3,12 @@
     {
       "profile": "coding",
       "image": "m0-coding",
-      "description": "Reusable coding image: machine0 loaded profile + Hermes/OpenCode + polyglot toolchain",
+      "description": "Reusable coding image: machine0 loaded profile + Hermes/OpenCode + devenv + polyglot toolchain",
       "builderSize": "large",
-      "testSize": "medium",
-      "minSize": "medium"
+      "testSize": "large",
+      "minSize": "large",
+      "minDiskGB": 80,
+      "note": "The builder's disk size becomes the image's minimum VM size, so a `large` builder (80 GB) means project VMs must be `large` or bigger — medium (60 GB) does not fit. Rebuild with --size medium if you only ever need small VMs."
     }
   ]
 }

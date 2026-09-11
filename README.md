@@ -68,9 +68,14 @@ machine0 images ls
 From then on a project VM is one command and needs no build:
 
 ```bash
-bin/m0-new api                 # machine0 new api --image m0-coding --size medium
+bin/m0-new api                 # machine0 new api --image m0-coding --size large
 machine0 ssh api
 ```
+
+**Size floor: `large`.** The image was built on a `large` builder, and a
+builder's disk size becomes the image's minimum — `m0-coding` reports
+`Min. Disk 80 GB`, so `medium` (60 GB) will not boot it. Build with
+`--size medium` if you only ever want smaller VMs.
 
 Make it the default so bare `machine0 new <name>` picks it up:
 

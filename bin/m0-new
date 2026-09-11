@@ -11,7 +11,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 project="${1:?usage: m0-new <project> [size] [m0-profile]}"
-size="${2:-medium}"
+# Default size is `large` because the image's min disk is 80 GB (the builder's
+# disk size becomes the image's minimum). `medium` (60 GB) does NOT fit.
+size="${2:-large}"
 m0profile="${3:-default}"
 image="${M0_IMAGE:-$(jq -r '.profiles[0].image' manifest.json)}"
 

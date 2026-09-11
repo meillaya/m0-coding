@@ -22,6 +22,7 @@
   lib,
   inputs,
   mkMotd,
+  nixpkgsUnstable ? null,
   ...
 }:
 let
@@ -30,6 +31,18 @@ let
   cfg = config.m0coding;
 
   hermesPkg = inputs.hermes-agent.packages.${system}.default;
+
+  # devenv from nixpkgs-unstable: 25.11 ships 1.11.x while the ecosystem is on
+  # 2.x (devenv shell warns about the gap). Same convention this repo already
+  # uses for claude-code / codex / playwright-driver via lib/overlays.nix.
+  devenvPkg =
+    if nixpkgsUnstable != null then
+      (import nixpkgsUnstable {
+        inherit system;
+        config.allowUnfree = true;
+      }).devenv
+    else
+      pkgs.devenv;
 
   nonNixShellPackages = with pkgs; [
     # ── Runtimes / package managers on top of loaded's python+rust+go+bun ──
@@ -40,7 +53,7 @@ let
     # ── Per-project workflow ──────────────────────────────────────────────
     direnv # `use flake` / `use devenv` in .envrc, wired into zsh below
     nix-direnv # cached devShell envs
-    devenv # devenv.sh: per-project dev environments (nix + devenv.nix)
+    devenvPkg # devenv.sh: per-project dev environments (nix + devenv.nix)
     just # task runner — most repos carry a justfile
     watchexec # re-run on change
     hyperfine # benchmark before/after a change
