@@ -21,7 +21,9 @@ echo "==> stopping $vm"
 machine0 stop "$vm"
 
 echo "==> snapshotting $vm -> image '$image'"
-machine0 images new "$vm" "$image" \
+# Canonical spelling in CLI 1.0.164; the docs/website call it `images new`
+# (accepted as an alias, same command).
+machine0 images save "$vm" "$image" \
   -d "$desc" \
   -m "$(jq -nc --arg rev "$rev" --arg dirty "$dirty" \
         '{flakeRev:$rev, uncommitted:($dirty|length>0)}')"

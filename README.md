@@ -28,14 +28,17 @@ Added by `modules/coding.nix`:
 - database/CLI clients: psql, redis-cli, sqlite
 - NixOS-patched Playwright browsers + `PLAYWRIGHT_*` env for the agents — toggleable via `m0coding.playwright.enable`
 
-Every addition is made at normal priority, so a project flake can override
-any of it.
+Every package and service addition is made at normal priority, so a project
+profile can override any of it (the MOTD is the exception — see the banner
+priority ladder in `modules/coding.nix`).
 
 ## Setup
 
 ```bash
-# 1. machine0 CLI + auth (once)
-curl -LsSf https://machine0.io/install.sh | sh
+# 1. machine0 CLI + auth (once). Node is already present here, so npm is the
+#    shorter path; the vendor script (curl -LsSf https://machine0.io/install.sh
+#    | sh) installs its own Node via nvm first.
+npm install -g @machine0/cli
 machine0 login
 
 # 2. cheap eval guard — catches bad option/package names without building
@@ -114,11 +117,13 @@ If you publish this repo publicly you can skip the VM+snapshot step and have
 machine0 build the image from git:
 
 ```bash
-machine0 images new m0-coding \
+machine0 images save m0-coding \
   --git-repo https://github.com/<you>/m0-coding \
   --nix-profile coding \
   --size large
 ```
+
+(`images new` is the same command — the website docs use that spelling.)
 
 Notes: public GitHub.com repos only (no submodules/LFS — the flake is
 fetched as a tarball), the profile must keep the `nix` user and SSH (it

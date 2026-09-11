@@ -52,9 +52,12 @@ change works without at least that eval passing.
 - `machine0 provision <vm> .#coding` syncs the *local* flake and runs
   `nixos-rebuild switch` on the VM — no GitHub publish needed while
   iterating. Budget ~10 minutes per build.
-- `machine0 images new <vm> <image>` snapshots a VM into a reusable, versioned
-  image. `machine0 images new <image> --git-repo <public-repo> --nix-profile
-  coding` builds server-side instead (public GitHub only).
+- `machine0 images save <vm> <image>` snapshots a VM into a reusable, versioned
+  image (the website docs spell it `images new` — same command).
+  `machine0 images save <image> --git-repo <public-repo> --nix-profile
+  coding` builds server-side instead (public GitHub only). Re-running `save`
+  onto an existing image creates a *draft* version you promote with
+  `machine0 images versions promote <image> <version>`.
 - VM sizes: small/medium/large/xl/xxl. Never test on `small` — nix eval OOMs.
 - `machine0 suspend <vm>` = snapshot + delete instance, pay only storage.
 - SSH user on NixOS images is `nix`; run login-shell commands as
