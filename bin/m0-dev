@@ -21,12 +21,21 @@ if ! command -v machine0 >/dev/null 2>&1; then
 fi
 
 if machine0 get "$vm" --json >/dev/null 2>&1; then
-  dist="$(machine0 get "$vm" --json | jq -r '.distribution // empty')"
+  json="$(machine0 get "$vm" --json)"
+  dist="$(jq -r '.distribution // empty' <<<"$json")"
   if [ "$dist" != "nixos" ]; then
     echo "error: $vm exists but is not a NixOS VM (distribution=$dist)" >&2
     exit 1
   fi
-  echo "==> reusing existing VM '$vm'"
+  status="$(jq -r '.status // empty' <<<"$json")"
+  if [ "$status" != "RUNNING" ]; then
+    # STOPPED and SUSPENDED VMs cannot be provisioned over ssh; `start`
+    # resumes a suspended VM from its snapshot with the same name/size/region.
+    echo "==> $vm exists but is $status — starting it"
+    machine0 start "$vm"
+  else
+    echo "==> reusing running VM '$vm'"
+  fi
 else
   echo "==> creating '$vm' from $base_image ($size)"
   # medium or larger: nix builds are CPU/RAM hungry, small is painful.
