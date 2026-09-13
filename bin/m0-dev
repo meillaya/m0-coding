@@ -13,6 +13,10 @@ vm="${1:-m0-dev}"
 size="${2:-large}"
 profile="${3:-coding}"
 base_image="${M0_BASE_IMAGE:-nixos-25-11-loaded}"
+# machine0 profile whose integrations (claude/codex/github creds, MCPs) get
+# injected into the VM. Injection happens at CREATE time, so a VM created
+# without it has no agent credentials — re-create or use `profiles deploy`.
+m0profile="${M0_PROFILE:-default}"
 
 if ! command -v machine0 >/dev/null 2>&1; then
   echo "machine0 CLI not found. Install it:" >&2
@@ -37,9 +41,9 @@ if machine0 get "$vm" --json >/dev/null 2>&1; then
     echo "==> reusing running VM '$vm'"
   fi
 else
-  echo "==> creating '$vm' from $base_image ($size)"
+  echo "==> creating '$vm' from $base_image ($size), machine0 profile '$m0profile'"
   # medium or larger: nix builds are CPU/RAM hungry, small is painful.
-  machine0 new "$vm" --image "$base_image" --size "$size"
+  machine0 new "$vm" --image "$base_image" --size "$size" --profile "$m0profile"
 fi
 
 echo "==> provisioning .#${profile} (syncs this flake, runs nixos-rebuild switch)"
@@ -58,6 +62,15 @@ machine0 ssh "$vm" '
   done
   echo
   if docker info >/dev/null 2>&1; then echo "  docker: up"; else echo "  docker: DOWN"; rc=1; fi
+  # Credentials are injected by the machine0 profile at CREATE time (see
+  # M0_PROFILE / --profile); a VM created without one has none of these.
+  if [ -f ~/.config/gh/hosts.yml ]; then
+    echo "  gh:     authenticated as $(gh api user -q .login 2>/dev/null || echo unknown)"
+  else
+    echo "  gh:     no credentials (VM not created with --profile)"
+  fi
+  [ -s ~/.codex/auth.json ] && echo "  codex:  authenticated" || echo "  codex:  NOT authenticated"
+  [ -d ~/.claude ] && [ -n "$(ls -A ~/.claude 2>/dev/null)" ] && echo "  claude: authenticated" || echo "  claude: NOT authenticated (run: machine0 integrations connect claude-code)"
   exit $rc
 '
 
