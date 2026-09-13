@@ -1,15 +1,23 @@
 # Example: a project profile layered on the coding image.
 #
-# Copy this directory to projects/<name>/ and edit. Two ways to use it:
+# Copy this directory to projects/<name>/, edit it, then add an entry to the
+# `profiles` map in the root flake.nix:
 #
-#   # A. rebuild an existing VM onto this profile (local sync, no publish)
-#   machine0 provision <vm> "./projects/example#api"
+#   example = [ machine0.nixosModules.loaded motdArg ./modules/coding.nix ./projects/example/project.nix ];
 #
-#   # B. from the project's own repo flake, consuming this one as an input:
+# and apply it with:
+#
+#   machine0 provision <vm> ".#example"
+#
+# Profiles live in the root flake on purpose: `machine0 provision <vm>
+# ./subdir#profile` syncs only that directory, so a sub-flake with a relative
+# `path:../..` input would resolve outside the synced tree. A project in its
+# OWN repo can instead consume the published flake:
+#
 #   #   inputs.m0coding.url = "github:<you>/m0-coding";
 #   #   nixosConfigurations.api = m0coding.lib.mkSystem [
 #   #     m0coding.nixosModules.coding
-#   #     ./projects/example/project.nix
+#   #     ./project.nix
 #   #   ];
 #
 # Keep it minimal: anything the project's devShell can provide (compilers,
