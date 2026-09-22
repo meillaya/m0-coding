@@ -46,8 +46,75 @@ else
   machine0 new "$vm" --image "$base_image" --size "$size" --profile "$m0profile"
 fi
 
+echo "==> making the dsh binary cache trusted on $vm"
+# The dsh closure is large and prebuilt: without this the first provision
+# compiles the whole pnpm workspace from source, because the substituter
+# modules/coding.nix adds is only live AFTER the switch that installs it.
+# /etc/nix/nix.conf is a NixOS-managed symlink into the store, so it has to
+# be replaced by a writable copy before anything can be appended; the next
+# switch regenerates it (with the same cache, from nix.settings).
+machine0 ssh "$vm" '
+  if grep -q deepseek-harness-nix /etc/nix/nix.conf 2>/dev/null; then
+    echo "  already trusted"
+  else
+    sudo sh -c "
+      { cat /etc/nix/nix.conf 2>/dev/null || :; } > /tmp/nix.conf.m0 &&
+      printf \"extra-substituters = https://deepseek-harness-nix.cachix.org\\nextra-trusted-public-keys = deepseek-harness-nix.cachix.org-1:5NrkwLN9veNMhiINtU5ZeV4isXFhFsOwn6Ms7J1M+TA=\\n\" >> /tmp/nix.conf.m0 &&
+      cp --remove-destination /tmp/nix.conf.m0 /etc/nix/nix.conf &&
+      systemctl restart nix-daemon
+    " && echo "  cache added, nix-daemon restarted"
+  fi
+'
+
+echo "==> seeding $vm's store with this repo's agent packages (. #omo, . #dsh)"
+# dsh's kernel bundle is built by node/esbuild and needs more RAM than this VM
+# has: provisioning a `large` (2 vCPU / 4 GB) box got the build OOM-killed.
+# So build/substitute the two agent packages HERE and push the closures; the VM
+# then only pulls the base system from the binary caches. A failure here is not
+# fatal — the VM falls back to building whatever it needs itself.
+if nix build --no-link .#omo .#dsh >/dev/null 2>&1; then
+  seed_list="$(mktemp)"
+  present_list="$(mktemp)"
+  missing_list="$(mktemp)"
+  # Every output of every derivation in the two packages' build closures (the
+  # runtime closures alone miss the build-only inputs, e.g. dsh's kernel).
+  # Each stage tolerates empty input: under `set -e` a bare grep/xargs finding
+  # nothing would abort the whole script.
+  {
+    for attr in omo dsh; do
+      drv="$(nix path-info --derivation ".#$attr" 2>/dev/null || true)"
+      if [ -n "$drv" ]; then
+        nix-store -qR "$drv" 2>/dev/null || true
+      fi
+    done
+  } | { grep '\.drv$' || true; } | xargs -r -n 200 nix-store -q --outputs 2>/dev/null | sort -u > "$seed_list" || true
+  while read -r p; do
+    if [ -e "$p" ]; then printf '%s\n' "$p"; fi
+  done < "$seed_list" > "$present_list"
+  # Ask the VM which of them it is missing (one ssh session, no key games),
+  # then push only those. `sudo nix-store --import` is deliberate: the daemon
+  # rejects unsigned paths from an untrusted client, root does not.
+  if machine0 ssh "$vm" 'cat > /tmp/m0-seed-list' < "$present_list" &&
+    machine0 ssh "$vm" 'while read -r p; do [ -e "$p" ] || echo "$p"; done < /tmp/m0-seed-list' > "$missing_list"; then
+    n_present=$(wc -l < "$present_list")
+    n_missing=$(wc -l < "$missing_list")
+    echo "    $n_present paths in the agent closures, $n_missing missing on the VM"
+    if [ "$n_missing" -gt 0 ]; then
+      if ! nix-store --export $(cat "$missing_list") | machine0 ssh "$vm" 'sudo nix-store --import' >/dev/null; then
+        echo "    WARNING: seeding failed; the VM will build what it needs itself" >&2
+      fi
+    fi
+  else
+    echo "    WARNING: could not compare stores with the VM; skipping the seed" >&2
+  fi
+  rm -f "$seed_list" "$present_list" "$missing_list"
+else
+  echo "    WARNING: could not build .#omo/.#dsh locally; the VM will build them itself" >&2
+fi
+
 echo "==> provisioning .#${profile} (syncs this flake, runs nixos-rebuild switch)"
-# 10 minutes is the documented budget for a provision build.
+# 10 minutes is the documented budget for a provision build; the first one
+# after adding/upgrading omo or dsh is longer (see the README ops notes).
 machine0 provision "$vm" ".#${profile}"
 
 echo "==> verifying agents on $vm"
@@ -57,7 +124,7 @@ echo "==> verifying agents on $vm"
 # includes /etc/profiles/per-user/nix/bin, so a login shell is not needed.
 machine0 ssh "$vm" '
   rc=0
-  for c in claude codex hermes opencode devenv direnv just docker node pnpm uv gh; do
+  for c in claude codex hermes opencode omo dsh devenv direnv just docker node pnpm uv gh; do
     if p=$(command -v "$c"); then printf "  ok    %s (%s)\n" "$c" "$p"; else printf "  MISS  %s\n" "$c"; rc=1; fi
   done
   echo
@@ -71,6 +138,13 @@ machine0 ssh "$vm" '
   fi
   [ -s ~/.codex/auth.json ] && echo "  codex:  authenticated" || echo "  codex:  NOT authenticated"
   [ -d ~/.claude ] && [ -n "$(ls -A ~/.claude 2>/dev/null)" ] && echo "  claude: authenticated" || echo "  claude: NOT authenticated (run: machine0 integrations connect claude-code)"
+  # OmO config is seeded by the module home activation; credentials are not
+  # (they arrive via env / m0coding.agents.omo.authFile).
+  [ -s ~/.omo/omo.json ] && echo "  omo:    config seeded (~/.omo/omo.json)" || { echo "  omo:    NO config (~/.omo/omo.json)"; rc=1; }
+  [ -s ~/.omo/agent/settings.json ] && echo "  omo:    settings seeded" || { echo "  omo:    NO settings (~/.omo/agent/settings.json)"; rc=1; }
+  [ -s ~/.omo/agent/auth.json ] && echo "  omo:    credentials present" || echo "  omo:    no ~/.omo/agent/auth.json (provider keys via env are fine)"
+  dsh_version=$(dsh --version 2>/dev/null | head -1)
+  echo "  dsh:    ${dsh_version:-MISSING}"
   exit $rc
 '
 

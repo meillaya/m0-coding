@@ -1,0 +1,95 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+  "agents": {
+    "plan-reviewer": {
+      "model": "opencode-go/deepseek-v4.1-flash",
+      "reasoning": "max"
+    },
+    "plan-consultant": {
+      "model": "opencode-go/deepseek-v4.1-flash",
+      "reasoning": "max"
+    },
+    "explore": {
+      "model": "openrouter/z-ai/glm-5.3-flash"
+    },
+    "librarian": {
+      "model": "openrouter/z-ai/glm-5.3-flash"
+    }
+  },
+  "categories": {
+    "quick": {
+      "models": [
+        {
+          "model": "openrouter/z-ai/glm-5.3-flash"
+        }
+      ]
+    },
+    "unspecified-low": {
+      "models": [
+        {
+          "model": "openrouter/z-ai/glm-5.3-flash"
+        }
+      ]
+    },
+    "unspecified-high": {
+      "models": [
+        {
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        {
+          "model": "openrouter/z-ai/glm-5.3-flash"
+        }
+      ]
+    },
+    "deep-low": {
+      "models": [
+        {
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        {
+          "model": "openrouter/z-ai/glm-5.3-flash"
+        }
+      ]
+    },
+    "ultrabrain": {
+      "models": [
+        {
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      ]
+    },
+    "architect": {
+      "models": [
+        {
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      ]
+    },
+    "artistry": {
+      "models": [
+        {
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      ]
+    },
+    "visual-engineering": {
+      "models": [
+        {
+          "model": "openrouter/z-ai/glm-5.3-flash"
+        }
+      ]
+    },
+    "writing": {
+      "models": [
+        {
+          "model": "openrouter/z-ai/glm-5.3-flash"
+        }
+      ]
+    }
+  },
+  "_migrations": [
+    "2026-08-reasoning-unification",
+    "2026-09-18-review-lanes-off-anthropic",
+    "2026-09-category-deep-split"
+  ]
+}

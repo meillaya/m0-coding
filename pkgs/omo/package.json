@@ -1,0 +1,8 @@
+{
+  "name": "omo-coding-image-deps",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "omo-ai": "5.0.0-0.beta.82"
+  }
+}

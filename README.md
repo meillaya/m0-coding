@@ -3,8 +3,8 @@
 One NixOS image, frozen once, cloned for every project. It is machine0's
 [`loaded` profile](https://github.com/fdmtl/machine0-nixos) (dev stack,
 rootless Docker, Claude Code, Codex, the Home Manager zsh) plus the rest of
-the agent set, **devenv.sh**, and the per-project conveniences a coding VM
-needs.
+the agent set (**OmO Native**, **DeepSeek Harness**, Hermes, OpenCode),
+**devenv.sh**, and the per-project conveniences a coding VM needs.
 
 This repo is a *private consumer flake*: it takes `machine0-nixos` as an
 input and layers one module on top. Nothing here is published to GitHub, and
@@ -14,13 +14,13 @@ no machine0 image has to be rebuilt per project.
 
 | Thing | Value |
 |---|---|
-| Image | `m0-coding` — version 1, `READY`/`ACTIVE`, region `eu`, 19.34 GB, **Min. Disk 80 GB** |
-| Image metadata | `flakeRev 834cbe8` with `uncommitted: true` (the devenv 2.x change was still in the working tree when it was frozen) |
-| `dev` VM | RUNNING, `large`, `eu` — created from the image with `--profile default`; gh + codex + machine0 credentials injected |
-| `m0-dev` VM | SUSPENDED — the image-iteration box; `bin/m0-dev` resumes it automatically |
+| Image | `m0-coding` — version 2, `READY`/`ACTIVE`, region `eu`, 38.39 GB, **Min. Disk 80 GB** |
+| Image metadata | `flakeRev 5ea7cd3` with `uncommitted: true` (the OmO + DeepSeek Harness layer was still in the working tree when it was frozen) |
+| `dev` VM | SUSPENDED, `large`, `eu` — created from image v1 with `--profile default`; gh + codex + machine0 credentials injected |
+| `m0-dev` VM | STOPPED — the image-iteration box; `bin/m0-dev` resumes it automatically. Its store already holds the built `omo`/`dsh`, so re-provisions are fast |
 | `DEFAULT_VM_IMAGE` | `m0-coding` (bare `machine0 new <name>` picks it up) |
-| Profile system packages | 187 |
-| Proven | the image builds end to end locally; a clone boots with every tool and no provisioning; `devenv shell` builds a real project env using the devenv cache |
+| Profile system packages | 189 (187 + `omo` + `dsh`) |
+| Proven | the image builds end to end locally; a clone boots with every tool and no provisioning; `devenv shell` builds a real project env using the devenv cache; on a provisioned VM `omo --version` → `omo 5.0.0-0.beta.82 (engine: senpi 2026.9.22)`, `dsh --version` → `0.1.6-alpha.2`, and `~/.omo/{omo.json,agent/settings.json}` match `files/omo/` byte for byte |
 
 Not yet done: `claude-code` is installed but **not authenticated** (its OAuth
 requires an interactive paste — see *Credentials*), and the repo has never
@@ -40,6 +40,17 @@ Inherited from machine0's `loaded` profile:
 Added by `modules/coding.nix`:
 
 - agents `hermes` (NousResearch) and `opencode` — toggleable via `m0coding.agents.*`
+- **OmO Native** (`omo`, omo.dev) — the multi-model agent harness, packaged
+  from a pinned `omo-ai@beta` npm release in `pkgs/omo/`. There is no nixpkgs
+  package, and the release is not a self-contained bundle (the senpi engine
+  needs its own `node_modules`), so it is a real `npm ci` tree; the wrapper
+  pins nixpkgs' node 24 because omo only re-execs under bun when it finds
+  bun >= 1.4 and 25.11 ships bun 1.3.3. Toggle: `m0coding.agents.omo.enable`
+- **DeepSeek Harness** (`dsh`) — the `presets.tui` composition from
+  `github:moraxyc/deepseek-harness.nix`, taken from that flake's own package
+  set (its overlay wants `pnpm_11`, which 25.11 nixpkgs does not have — see
+  the module comment) and shipped with its binary cache added to
+  `nix.settings.substituters`. Toggle: `m0coding.agents.dsh.enable`
 - **devenv.sh 2.1.2** + direnv + nix-direnv, so any project gets its own
   reproducible environment. It comes from **nixpkgs-unstable**, not the 25.11
   release channel, which still ships the 1.11.x line and prints an
@@ -87,10 +98,14 @@ bin/m0-dev               # create (or resume) m0-dev, provision .#coding, verify
 ```
 
 `bin/m0-dev` creates `m0-dev` from `nixos-25-11-loaded` if missing, starts it
-if it is stopped/suspended, runs `machine0 provision m0-dev .#coding` (a local
-sync — no GitHub publish needed), then verifies all 12 tools, Docker, and the
-injected credentials. Edit `modules/coding.nix`, re-run it, and the same VM is
-rebuilt in place. Budget ~5–10 minutes per provision.
+if it is stopped/suspended, makes the dsh binary cache trusted on it, **seeds
+its store with `.#omo` + `.#dsh`** (see the ops note — the dsh kernel build
+OOM-kills a 4 GB VM), runs `machine0 provision m0-dev .#coding` (a local sync —
+no GitHub publish needed), then verifies every tool (now `omo` and `dsh`
+included), the seeded OmO config, Docker, and the injected credentials. Edit
+`modules/coding.nix`, re-run it, and the same VM is rebuilt in place. The
+first run is the slow one (it builds `omo` + `dsh` on *this* machine); after
+that a provision is back to ~5–10 minutes.
 
 To build the image locally instead (validates the image path end to end):
 `bin/m0-build` → `./result-image/nixos-image-*.qcow2.gz`.
@@ -154,6 +169,33 @@ Lightest first:
    ];
    ```
 
+## Agent configuration: OmO comes from this repo, credentials never do
+
+`modules/coding.nix` seeds OmO's user config once per home, copy-if-missing
+(so the agent's own rewrites of those files survive a rebuild):
+
+| repo file | lands at | what it is |
+|---|---|---|
+| `files/omo/omo.json` | `~/.omo/omo.json` | agent + category model routing |
+| `files/omo/agent/settings.json` | `~/.omo/agent/settings.json` | theme, default provider/model, thinking levels |
+
+The rest of a real OmO home (`auth.json`, `models-store.json`, `sessions/`,
+`extensions/` — the last three are generated at runtime) is machine state and
+is deliberately **not** in this repo: `auth.json` is a credential store. Give
+a VM credentials one of two ways:
+
+1. **Environment** — the engine reads `OPENROUTER_API_KEY`,
+   `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and `DEEPSEEK_API_KEY` from the
+   environment, so the machine0 profile inject (`~/.machine0/env.sh`, sourced
+   by every login shell) is enough. `dsh` uses the same mechanism for
+   `DEEPSEEK_API_KEY`.
+2. **`m0coding.agents.omo.authFile = "path/on/the/vm.json"`** — installed as
+   `~/.omo/agent/auth.json` (0600) the first time a home is activated.
+
+Bumping the agent means editing `pkgs/omo/package.json`, the `version` in
+`pkgs/omo/default.nix`, refreshing the lockfile and re-running
+`prefetch-npm-deps` — the exact three commands are in that file's header.
+
 ## Credentials come from the profile, at create time
 
 The image has the *clients*; auth is injected per VM by a machine0 profile.
@@ -191,6 +233,28 @@ size floor; the scripts read it.
 
 ## Ops notes
 
+- **The dsh closure is big, only partially cached, and needs RAM to build.**
+  `modules/coding.nix` adds `deepseek-harness-nix.cachix.org` and its key to
+  `nix.settings.substituters`, so the image and every clone substitute what
+  the upstream cache has. Two paths need help because they run *before* the
+  new substituters are live: `bin/m0-dev` writes the same cache into the
+  VM's `/etc/nix/nix.conf`, restarts `nix-daemon`, and only then provisions
+  (a switch makes new `nix.settings` live only after it finishes), and
+  `bin/m0-build` passes the key on the command line (this workstation sets
+  `trusted-users = mei`, so that is honored).
+- **A `large` VM cannot *build* dsh; `bin/m0-dev` seeds its store instead.**
+  dsh's kernel bundle is compiled by node/esbuild and the first attempt got
+  the build OOM-killed on a 2 vCPU / 4 GB box (load average 30). So the script
+  builds/substitutes `.#omo` and `.#dsh` **here**, asks the VM which of those
+  store paths it lacks, and pipes only those in (`nix-store --export |
+  machine0 ssh … 'sudo nix-store --import'` — root, because the daemon rejects
+  unsigned paths from an untrusted client). The VM then only pulls the base
+  system from the binary caches and the provision stays inside a `large` VM.
+  That is deliberate: the builder's disk size becomes the image's minimum, so
+  moving the build to an `xl` VM would push every project VM from `large`
+  ($0.052/hr, 80 GB) to `xl` ($0.104/hr, 160 GB).
+- **`nix build .#omo` / `.#dsh`** build the two agents on their own (that is
+  what the seeding step uses); they are the same derivations the image ships.
 - **Local builds need machine0's caches.** `bin/m0-build` passes
   `machine0.cachix.org` + `cache.garnix.io`. Without them nix compiles ~450
   derivations from source; with them it is ~44 trivial ones plus ~2.6 GiB of

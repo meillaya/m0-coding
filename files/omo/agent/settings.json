@@ -1,0 +1,20 @@
+{
+  "theme": "dark",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash",
+  "modelThinkingLevels": {
+    "opencode-go/deepseek-v4-flash": "off",
+    "opencode-go/minimax-m3": "high",
+    "opencode-go/minimax-m2.7": "high",
+    "openrouter/deepseek/deepseek-v4.1-flash": "high",
+    "openrouter/z-ai/glm-5.3-flash": "high",
+    "opencode-go/deepseek-v4.1-flash": "high"
+  },
+  "modelLastOnThinkingLevels": {
+    "opencode-go/minimax-m3": "high",
+    "opencode-go/minimax-m2.7": "high",
+    "openrouter/deepseek/deepseek-v4.1-flash": "high",
+    "openrouter/z-ai/glm-5.3-flash": "high",
+    "opencode-go/deepseek-v4.1-flash": "high"
+  }
+}

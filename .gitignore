@@ -5,6 +5,10 @@ result-*
 *.qcow2
 *.qcow2.gz
 
+# npm working tree if anyone runs `npm install` inside the OmO package
+# (only package.json + package-lock.json are tracked there)
+pkgs/omo/node_modules/
+
 # Local read-only clone of github:fdmtl/machine0-nixos used for reference
 # while writing modules/coding.nix. Safe to delete.
 upstream/

@@ -3,7 +3,7 @@
     {
       "profile": "coding",
       "image": "m0-coding",
-      "description": "Reusable coding image: machine0 loaded profile + Hermes/OpenCode + devenv + polyglot toolchain",
+      "description": "Reusable coding image: machine0 loaded profile + OmO Native (omo) + DeepSeek Harness (dsh) + Hermes/OpenCode + devenv + polyglot toolchain",
       "builderSize": "large",
       "testSize": "large",
       "minSize": "large",
