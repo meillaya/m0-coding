@@ -14,8 +14,8 @@ no machine0 image has to be rebuilt per project.
 
 | Thing | Value |
 |---|---|
-| Image | `m0-coding` — version 2, `READY`/`ACTIVE`, region `eu`, 38.39 GB, **Min. Disk 80 GB** |
-| Image metadata | `flakeRev 5ea7cd3` with `uncommitted: true` (the OmO + DeepSeek Harness layer was still in the working tree when it was frozen) |
+| Image | `m0-coding` — version 3, `READY`/`ACTIVE`, region `eu`, 38.39 GB, **Min. Disk 80 GB** |
+| Image metadata | `flakeRev 6b03889` with `uncommitted: false` (v2 was frozen from the pre-commit tree; v3 re-freezes the same VM against the committed revision) |
 | `dev` VM | SUSPENDED, `large`, `eu` — created from image v1 with `--profile default`; gh + codex + machine0 credentials injected |
 | `m0-dev` VM | STOPPED — the image-iteration box; `bin/m0-dev` resumes it automatically. Its store already holds the built `omo`/`dsh`, so re-provisions are fast |
 | `DEFAULT_VM_IMAGE` | `m0-coding` (bare `machine0 new <name>` picks it up) |
