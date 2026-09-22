@@ -17,8 +17,23 @@ desc="${3:-coding image $(git rev-parse --short HEAD 2>/dev/null || echo no-git)
 rev="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 dirty="$(git status --porcelain 2>/dev/null | head -c 200 || true)"
 
-echo "==> stopping $vm"
-machine0 stop "$vm"
+# `machine0 stop` insists on RUNNING, and a STOPPED VM (re-freezing the same
+# box after a previous snapshot) is already in the state the snapshot wants.
+# SUSPENDED has no instance at all, so it has to be resumed first.
+status="$(machine0 get "$vm" --json 2>/dev/null | jq -r '.status // empty')"
+case "$status" in
+  RUNNING)
+    echo "==> stopping $vm"
+    machine0 stop "$vm"
+    ;;
+  STOPPED)
+    echo "==> $vm is already STOPPED"
+    ;;
+  *)
+    echo "error: $vm is ${status:-unknown} — start it first: machine0 start $vm" >&2
+    exit 1
+    ;;
+esac
 
 echo "==> snapshotting $vm -> image '$image'"
 # Canonical spelling in CLI 1.0.164; the docs/website call it `images new`
