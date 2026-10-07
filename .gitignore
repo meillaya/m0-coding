@@ -9,6 +9,11 @@ result-*
 # (only package.json + package-lock.json are tracked there)
 pkgs/omo/node_modules/
 
+# zix crash-net snapshots (git is the real history)
+zix/backups/
+
 # Local read-only clone of github:fdmtl/machine0-nixos used for reference
 # while writing modules/coding.nix. Safe to delete.
 upstream/
+# Python bytecode from running the vendored zix CLI
+__pycache__/

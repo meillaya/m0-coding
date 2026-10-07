@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "name": "m0-coding",
+  "description": "machine0 m0-coding image flake - zix manages modules/packages.nix (the image package list) and provides runtime installs (`zix get`) inside the image",
+  "system": "x86_64-linux",
+  "targets": {
+    "image": {
+      "kind": "list",
+      "file": "modules/packages.nix"
+    }
+  },
+  "default_target": "image",
+  "no_pins": true,
+  "checks": {
+    "quick": [
+      [
+        "nix",
+        "flake",
+        "check",
+        "--no-build"
+      ]
+    ]
+  },
+  "tools": {
+    "multiverse": {
+      "command": [
+        "nix",
+        "run",
+        "github:fzakaria/nixpkgs-multiverse#mvs",
+        "--"
+      ]
+    }
+  },
+  "sandbox": {
+    "image": "docker.io/fmzakari/omnibin:latest",
+    "name_prefix": "zix-",
+    "runtime": "auto",
+    "workdir": "/workspace"
+  }
+}

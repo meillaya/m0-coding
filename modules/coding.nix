@@ -47,6 +47,14 @@ let
   # The user's OmO config, seeded per home by the activation script below.
   omoDefaults = ../files/omo;
 
+  # ── zix ──────────────────────────────────────────────────────────────────
+  # The runtime package CLI (vendored under tools/zix, packaged by pkgs/zix):
+  # agents run `zix get NAME[@VERSION]` inside the VM, resolving through
+  # nixpkgs-multiverse's store-path index. modules/packages.nix is the image's
+  # declarative package list, managed with `nix run .#zix -- pkg add NAME`.
+  zixPkg = import ../pkgs/zix { inherit pkgs; };
+  zixExtraPackages = import ./packages.nix { inherit pkgs; };
+
   # ── DeepSeek Harness (`dsh`) ─────────────────────────────────────────────
   # Deliberately taken from the dsh flake's OWN package set instead of
   # importing its NixOS module: that module applies its overlay to *our*
@@ -163,6 +171,16 @@ in
       '';
     };
 
+    zix.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Install the zix CLI (runtime package acquisition inside the image:
+        `zix get NAME[@VERSION]`) and seed the runtime manifest at
+        /etc/zix/zix.json.
+      '';
+    };
+
     playwright.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -187,10 +205,12 @@ in
   # ── Config ───────────────────────────────────────────────────────────────
   config = {
     environment.systemPackages = nonNixShellPackages
+      ++ zixExtraPackages
       ++ lib.optionals cfg.agents.hermes.enable [ hermesPkg ]
       ++ lib.optionals cfg.agents.opencode.enable [ pkgs.opencode ]
       ++ lib.optional cfg.agents.omo.enable omoPkg
       ++ lib.optional (cfg.agents.dsh.enable && dshPkg != null) dshPkg
+      ++ lib.optional cfg.zix.enable zixPkg
       ++ lib.optionals cfg.playwright.enable [ playwrightBrowsers ];
 
     assertions = [
@@ -204,6 +224,25 @@ in
         '';
       }
     ];
+
+    # Runtime zix manifest. `zix` prefers the nearest zix.json (a project
+    # checkout); when an agent runs from an arbitrary directory there is none,
+    # so it falls back to this one. Read-only on purpose - runtime installs
+    # land in the invoking user's nix profile, never in this file.
+    environment.etc."zix/zix.json" = lib.mkIf cfg.zix.enable {
+      text = builtins.toJSON {
+        version = 1;
+        name = "m0-coding-runtime";
+        runtime_only = true;
+        system = pkgs.stdenv.hostPlatform.system;
+        tools.multiverse.command = [
+          "nix"
+          "run"
+          "github:fzakaria/nixpkgs-multiverse#mvs"
+          "--"
+        ];
+      };
+    };
 
     # devenv.sh pulls prebuilt toolchains from its own cache; without it
     # every `devenv shell` on a fresh project compiles from source. `dsh` is
@@ -248,6 +287,11 @@ in
         # caught it: `omo: NO config`).
         home =
           {
+            # `zix get` and `nix profile install` write ~/.nix-profile; HM
+            # packages live in /etc/profiles/per-user/nix, so without this the
+            # runtime installs would be invisible to interactive shells.
+            sessionPath = [ "$HOME/.nix-profile/bin" ];
+
             activation.m0SeedOmoConfig = lib.mkIf cfg.agents.omo.enable (
               lib.hm.dag.entryAfter [ "writeBoundary" ] (
                 ''
@@ -307,6 +351,11 @@ in
           "$ dsh             # DeepSeek Harness (TUI)"
           "$ hermes setup    # Hermes Agent (first run)"
           "$ opencode        # OpenCode"
+          ""
+          "# Packages on demand (zix; no rebuild, no nixpkgs eval):"
+          "$ zix get ripgrep                # any package, latest"
+          "$ zix get hello@2.10             # any version ever shipped"
+          "$ zix get --list                 # what is installed"
           ""
           "# Per-project environments (devenv.sh + direnv):"
           "$ devenv init     # writes devenv.nix / devenv.yaml"

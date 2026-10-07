@@ -75,6 +75,7 @@
             nodejs = upstreamPkgs.nodejs_24;
           };
           dsh = deepseek-harness.legacyPackages.${system}.presets.tui;
+          zix = import ./pkgs/zix { pkgs = upstreamPkgs; };
         };
     in
     {
@@ -84,7 +85,7 @@
       };
 
       # The two agents this repo packages itself are exposed alongside the
-      # image outputs as .#omo / .#dsh (see `agentPackages` above).
+      # image outputs as .#omo / .#dsh, plus .#zix for the runtime package CLI.
       # `nix build .#coding` -> gzipped qcow2 image.
       packages.${system} =
         builtins.mapAttrs (_: mkImage) profiles
@@ -92,6 +93,13 @@
         // {
           default = self.packages.${system}.coding;
         };
+
+      # `nix run .#zix -- pkg add NAME` (the image package list) and
+      # `nix run .#zix -- get NAME@VERSION` (a one-off runtime install).
+      apps.${system}.zix = {
+        type = "app";
+        program = "${self.packages.${system}.zix}/bin/zix";
+      };
 
       # For a *project* flake that wants this base plus its own module:
       #   m0coding.lib.mkSystem [ m0coding.nixosModules.coding ./project.nix ]

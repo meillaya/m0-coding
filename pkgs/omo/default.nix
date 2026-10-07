@@ -1,4 +1,5 @@
-# OmO Native — the `omo` coding agent (npm package `omo-ai`, beta channel).
+# OmO Native — the `omo` coding agent (npm package `omo-ai`, stable channel;
+# omo left beta in 2026-10 — `omo-ai@beta` is gone, `latest` is the release).
 #
 # There is no nixpkgs package for it, so this is the npm release, pinned.
 # Two details make it more than a one-liner:
@@ -15,7 +16,7 @@
 #     stays deterministic: omo runs on node inside the image.
 #
 # Bump procedure (version, lockfile and hash move together):
-#   1. npm view omo-ai@beta version
+#   1. npm view omo-ai version            # latest stable
 #   2. set `version` below AND in pkgs/omo/package.json
 #   3. (cd pkgs/omo && npm install --package-lock-only --ignore-scripts)
 #   4. prefetch-npm-deps pkgs/omo/package-lock.json  -> npmDepsHash
@@ -23,14 +24,14 @@
 
 pkgs.buildNpmPackage rec {
   pname = "omo";
-  version = "5.0.0-0.beta.82";
+  version = "5.1.22";
 
   # package.json + package-lock.json live next to this file. `src` covers the
   # whole directory; only the two manifests reach the dependency cache.
   src = ./.;
 
   # Recompute with `prefetch-npm-deps pkgs/omo/package-lock.json`.
-  npmDepsHash = "sha256-nbG0NauZF5fkyFccu/tV3t4ATIGtJXVHsnKtUenRW7s=";
+  npmDepsHash = "sha256-8XPFa9iW+F5gvpDiJ70hAFVsv/Zaf6ngDKwvqQ8IIeI=";
 
   inherit nodejs;
 

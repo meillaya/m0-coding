@@ -12,6 +12,10 @@ flake.nix            # inputs machine0-nixos; defines the `coding` module chain,
                      # nixosModules.coding + lib.mkSystem for project flakes
 manifest.json        # profile -> machine0 image slug, read by bin/ scripts
 modules/coding.nix   # the only layer this repo adds
+modules/packages.nix # image packages managed by zix (marker block)
+zix.json             # zix manifest: target modules/packages.nix, tools, checks
+pkgs/zix/            # zix CLI packaged for the image (source: tools/zix/)
+tools/zix/           # vendored zix CLI (mirror of the nixos repo's tools/zix)
 pkgs/omo/            # OmO Native (omo.dev) built from a pinned npm lockfile
 files/omo/           # OmO user config seeded into ~/.omo (omo.json + settings)
 projects/example/    # template for a per-project profile (services, ports)
@@ -33,10 +37,22 @@ bin/m0-new           # create a project VM from the reusable image
   exceptions, both for good reasons, are `pkgs/omo/` (the OmO derivation needs
   its npm lockfile next to it) and `files/omo/` (the OmO config payload).
 - `omo` is npm-only. It lives in `pkgs/omo/` as a `buildNpmPackage` over a
-  pinned `omo-ai@beta` release; version, `package.json`, `package-lock.json`
+  pinned `omo-ai` release (5.1.22 — the stable channel; omo left beta in
+  2026-10); version, `package.json`, `package-lock.json`
   and `npmDepsHash` must move together (three commands in that file's header).
   Do not swap it for a bun-global install at activation: the image has to boot
   with the agent already present.
+- `zix` (tools/zix, packaged by pkgs/zix) is the runtime package CLI inside
+  the image: `zix get NAME[@VERSION]` installs into the user's nix profile via
+  nixpkgs-multiverse's store-path index (no nixpkgs eval), and falls back to
+  the evaluating road when the index has no match. `tools/zix` is a *vendored
+  mirror* of the nixos repo's `tools/zix` — when changing one, rsync it to the
+  other (and to railway-nix-agent/vendor/zix if that repo is in play).
+  Declarative image packages go through `modules/packages.nix`:
+  `nix run .#zix -- pkg add NAME` (default_target=image); version pins are
+  disabled here (`no_pins`), exact versions install at runtime instead.
+  Do not hand-edit inside the `# BEGIN zix`/`# END zix` markers, and keep the
+  marker lines indented with exactly two spaces (zix matches them literally).
 - `dsh` comes from the `deepseek-harness` input's own
   `legacyPackages.<system>.presets.tui`, NOT from its `nixosModules.default`:
   that module applies the flake's overlay to *our* pkgs, and the overlay needs
@@ -68,6 +84,8 @@ bin/m0-new           # create a project VM from the reusable image
 ```bash
 nix flake check                                    # eval-only guard, fast
 nix eval --no-eval-cache '.#nixosConfigurations.coding.config.system.build.toplevel.drvPath'
+nix build .#zix && ./result/bin/zix --version      # the runtime CLI still builds
+nix run .#zix -- --repo . doctor                   # zix manifest sanity
 bin/m0-dev                                         # provision + agent check on a real VM
 ```
 

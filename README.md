@@ -20,7 +20,7 @@ no machine0 image has to be rebuilt per project.
 | `m0-dev` VM | STOPPED — the image-iteration box; `bin/m0-dev` resumes it automatically. Its store already holds the built `omo`/`dsh`, so re-provisions are fast |
 | `DEFAULT_VM_IMAGE` | `m0-coding` (bare `machine0 new <name>` picks it up) |
 | Profile system packages | 189 (187 + `omo` + `dsh`) |
-| Proven | the image builds end to end locally; a clone boots with every tool and no provisioning; `devenv shell` builds a real project env using the devenv cache; on a provisioned VM `omo --version` → `omo 5.0.0-0.beta.82 (engine: senpi 2026.9.22)`, `dsh --version` → `0.1.6-alpha.2`, and `~/.omo/{omo.json,agent/settings.json}` match `files/omo/` byte for byte |
+| Proven | the image builds end to end locally; a clone boots with every tool and no provisioning; `devenv shell` builds a real project env using the devenv cache; on a provisioned VM `omo --version` → `omo 5.0.0-0.beta.82 (engine: senpi 2026.9.22)`, `dsh --version` → `0.1.6-alpha.2`, and `~/.omo/{omo.json,agent/settings.json}` match `files/omo/` byte for byte. 2026-10-07: `pkgs/omo` bumped to `omo-ai` 5.1.22 (stable channel) and re-verified locally — `nix build .#omo` → `omo 5.1.22 (engine: senpi 2026.10.10-5)`; `zix` added (see below) and `nix flake check` + `nix build .#zix` pass on the workstation |
 
 Not yet done: `claude-code` is installed but **not authenticated** (its OAuth
 requires an interactive paste — see *Credentials*), and the repo has never
@@ -41,7 +41,9 @@ Added by `modules/coding.nix`:
 
 - agents `hermes` (NousResearch) and `opencode` — toggleable via `m0coding.agents.*`
 - **OmO Native** (`omo`, omo.dev) — the multi-model agent harness, packaged
-  from a pinned `omo-ai@beta` npm release in `pkgs/omo/`. There is no nixpkgs
+  from a pinned `omo-ai` npm release in `pkgs/omo/` (5.1.22; omo left the
+  beta channel in 2026-10 — `omo-ai@beta` is gone and `latest` is the
+  release). There is no nixpkgs
   package, and the release is not a self-contained bundle (the senpi engine
   needs its own `node_modules`), so it is a real `npm ci` tree; the wrapper
   pins nixpkgs' node 24 because omo only re-execs under bun when it finds
@@ -282,6 +284,40 @@ size floor; the scripts read it.
   existing name creates a *draft* version.
 - **Snapshots are region-bound** (`eu` here); creating a VM in another region
   triggers a server-side transfer.
+
+## Size and speed levers (measured 2026-10-07)
+
+Closure sizes below are store bytes summed from the binary caches' narinfo
+(cache.nixos.org + the machine0/deepseek/devenv caches). Savings are each
+package's own closure; shared libraries reduce the real disk saving. The
+38.39 GB image version is a *snapshot*: it carries the VM's in-image store
+growth (build leftovers, docker storage, journal), not just the declarative
+closure (~12.6 GiB; the local flake build is a 3.81 GiB qcow2.gz on a
+17.52 GiB disk).
+
+The Min. Disk floor is set by the **builder's disk size at save time, not by
+content**: saving from a medium builder lowers it 80 -> 60 GB in one resave
+(project VMs drop from $0.052/hr to $0.034/hr). Content trims pay off as
+snapshot size ($0.078/GB-month) and provision time either way.
+
+| lever | saving | how |
+| --- | --- | --- |
+| drop dsh | 4.18 GiB | `m0coding.agents.dsh.enable = false` |
+| drop Playwright browsers | 2.14 GiB | `m0coding.playwright.enable = false` |
+| rust + cargo | 1.58 GiB | fork upstream's `development/packages.nix` |
+| rootless Docker | 0.90 GiB | fork (`virtualisation.docker.rootless.enable = false`) |
+| devenv | 0.86 GiB | drop `devenvPkg` from `modules/coding.nix` |
+| omo | 0.72 GiB | `m0coding.agents.omo.enable = false` |
+| opencode | 0.50 GiB | `m0coding.agents.opencode.enable = false` |
+| VM store garbage before a snapshot | up to ~20 GB (ASSUMED) | on the VM before `bin/m0-snap`: `sudo nix-collect-garbage -d; sudo nix-store --optimise; sudo rm -rf /var/lib/docker` |
+| smaller builder | Min. Disk 80 -> 60 GB | `machine0 images save ... --size medium`, if the disk content fits |
+
+Speed: a first provision realises the whole closure (~12.6 GiB) on a VM whose
+nix runs `max-jobs = 1`; `bin/m0-dev` seeds `.#omo`/`.#dsh` so the VM never
+compiles them. dsh and claude-code are not substitutable from the configured
+caches today (373 derivations), so they dominate a cold provision - the image
+ships them, which is what the snapshot is for. Runtime package installs go
+through `zix get` (store-path index, no nixpkgs eval) instead of a rebuild.
 
 ## Server-side image builds (optional, untested here)
 
