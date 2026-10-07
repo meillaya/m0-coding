@@ -1,6 +1,7 @@
 # m0-coding — agent notes
 
-A private flake that layers a `coding` profile on top of
+A flake (public: [meillaya/m0-coding](https://github.com/meillaya/m0-coding))
+that layers a `coding` profile on top of
 [`github:fdmtl/machine0-nixos`](https://github.com/fdmtl/machine0-nixos) and
 freezes it into the reusable machine0 image `m0-coding`.
 

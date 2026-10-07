@@ -6,9 +6,10 @@ rootless Docker, Claude Code, Codex, the Home Manager zsh) plus the rest of
 the agent set (**OmO Native**, **DeepSeek Harness**, Hermes, OpenCode),
 **devenv.sh**, and the per-project conveniences a coding VM needs.
 
-This repo is a *private consumer flake*: it takes `machine0-nixos` as an
-input and layers one module on top. Nothing here is published to GitHub, and
-no machine0 image has to be rebuilt per project.
+This repo is a consumer flake, published at
+[`meillaya/m0-coding`](https://github.com/meillaya/m0-coding): it takes
+`machine0-nixos` as an input and layers one module on top, and no machine0
+image has to be rebuilt per project.
 
 ## Current state
 
@@ -164,7 +165,7 @@ Lightest first:
 3. **A separate project flake that consumes this one** (once published):
 
    ```nix
-   inputs.m0coding.url = "github:<you>/m0-coding";
+   inputs.m0coding.url = "github:meillaya/m0-coding";
    nixosConfigurations.api = m0coding.lib.mkSystem [
      m0coding.nixosModules.coding
      ./project.nix
@@ -264,10 +265,10 @@ size floor; the scripts read it.
 - **auto-upgrade is disabled by default.** Upstream sets
   `system.autoUpgrade.flake = "github:fdmtl/machine0-nixos"`, which would
   rebuild the plain `loaded` profile nightly and silently drop this layer.
-  Once this repo is published, re-enable it against your own repo:
+  The repo is public, so re-enable it against it directly:
 
   ```nix
-  m0coding.autoUpgradeFlake = "github:<you>/m0-coding#coding";
+  m0coding.autoUpgradeFlake = "github:meillaya/m0-coding#coding";
   ```
 
 - **Rebuild from the repo, not on the VM.** `/etc/nixos` on a machine0 VM
@@ -321,11 +322,11 @@ through `zix get` (store-path index, no nixpkgs eval) instead of a rebuild.
 
 ## Server-side image builds (optional, untested here)
 
-If you publish this repo publicly you can skip the VM+snapshot step:
+The repo is public, so you can skip the VM+snapshot step:
 
 ```bash
 machine0 images save m0-coding \
-  --git-repo https://github.com/<you>/m0-coding \
+  --git-repo https://github.com/meillaya/m0-coding \
   --nix-profile coding \
   --size large
 ```
